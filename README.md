@@ -23,38 +23,53 @@ Pkg.add(url = "https://github.com/NumericalEarth/LegacyConnectors.jl")
 
 ## Quickstart
 
-Read a sounding, load it onto a Breeze grid as Oceananigans `Field`s,
-and plot with the Oceananigans Makie extension:
+Read a sounding, load its profiles onto Oceananigans `Field`s on a
+Breeze grid, and plot them with the Oceananigans Makie extension:
+
+![Quickstart: θ, qv, u profiles from the Weisman–Klemp 1982 sounding](docs/src/assets/readme_quickstart.png)
 
 ```julia
 using LegacyConnectors, Breeze, CairoMakie
 
-# 1. Read one of the three bundled example soundings (or your own file).
 sounding = read_sounding(example_sounding(:weisman_klemp_1982))
 
-# 2. Build a small column grid and allocate Fields for θ, qv, u, v.
 grid = RectilinearGrid(CPU(); size = (1, 1, 64),
                        x = (0, 1), y = (0, 1), z = (0, 16_000),
                        topology = (Periodic, Periodic, Bounded))
-θ, qv, u, v = (CenterField(grid) for _ in 1:4)
 
-# 3. Linearly interpolate sounding profiles onto each Field.
-for (f, p) in ((θ, :θ), (qv, :qv), (u, :u), (v, :v))
-    LegacyConnectors.set!(f, sounding; profile = p)
+θ, qv, u = (CenterField(grid) for _ in 1:3)
+for (f, p) in ((θ, :θ), (qv, :qv), (u, :u))
+    set!(f, sounding; profile = p)
 end
 
-# 4. Plot — Oceananigans' Makie ext renders Fields directly.
 fig = Figure(size = (900, 400))
-lines(fig[1, 1], θ;        axis = (; xlabel = "θ (K)",      ylabel = "z (m)"))
-lines(fig[1, 2], qv * 1000; axis = (; xlabel = "qv (g/kg)", ylabel = "z (m)"))
-lines(fig[1, 3], u;        axis = (; xlabel = "u (m/s)",    ylabel = "z (m)"))
+ax_θ  = Axis(fig[1, 1]; xlabel = "θ (K)",     ylabel = "z (m)")
+ax_qv = Axis(fig[1, 2]; xlabel = "qv (g/kg)", ylabel = "z (m)")
+ax_u  = Axis(fig[1, 3]; xlabel = "u (m/s)",   ylabel = "z (m)")
+lines!(ax_θ,  θ)
+lines!(ax_qv, qv * 1000)
+lines!(ax_u,  u)
 fig
 ```
 
-See the rendered version of this in the
-[Sounding → Breeze Field example](https://numericalearth.github.io/LegacyConnectors.jl/dev/literated/breeze_field/).
+To go further and build the hydrostatic base state Breeze uses for
+its anelastic / compressible split, pass the same sounding to
+`LegacyConnectors.reference_state`:
 
-If you only need the raw profile (no Breeze dep on the rendered side):
+```julia
+ref = LegacyConnectors.reference_state(sounding, grid)
+# ref.pressure, ref.density, ref.temperature are Fields — plot them
+# the same way.
+```
+
+The literated examples walk through both paths in detail — and the
+Weisman & Klemp example makes the case for skipping the file
+entirely when you have analytic forms:
+
+- [Weisman & Klemp 1982: analytic vs sounding](https://numericalearth.github.io/LegacyConnectors.jl/dev/literated/weisman_klemp_supercell/)
+- [Loading a real sounding into Breeze (KABQ + ReferenceState)](https://numericalearth.github.io/LegacyConnectors.jl/dev/literated/breeze_field/)
+
+If you only need the raw profile (no Breeze dep):
 
 ```julia
 using LegacyConnectors

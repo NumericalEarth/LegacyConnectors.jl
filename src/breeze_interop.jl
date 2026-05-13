@@ -5,6 +5,7 @@
 # discussion #672 for the motivating proposal.
 
 import Breeze
+import Breeze: set!
 using Breeze: Field, znodes
 
 """
@@ -38,8 +39,12 @@ grid = RectilinearGrid(CPU(); size = (1, 1, 64),
 
 θ = CenterField(grid)
 sounding = read_sounding(example_sounding(:weisman_klemp_1982))
-LegacyConnectors.set!(θ, sounding; profile = :θ)
+set!(θ, sounding; profile = :θ)
 ```
+
+This method *extends* `Breeze.set!` (i.e. `Oceananigans.set!`), so the
+same `set!` you use for analytic profiles — `set!(field, (x, y, z) -> …)` —
+also accepts a [`Sounding`](@ref).
 """
 function set!(field::Field, sounding::Sounding; profile::Symbol = :θ)
     surface, column = _surface_and_column(sounding, profile)
@@ -90,15 +95,41 @@ function _linear_interp(xs::AbstractVector, ys::AbstractVector, x::Real)
 end
 
 """
-    LegacyConnectors.reference_state(sounding::Sounding; grid)
+    LegacyConnectors.reference_state(sounding::Sounding, grid; kwargs...)
 
-Build a Breeze `ReferenceState` (hydrostatic base state in pressure,
-density, and Exner function) consistent with `sounding`.
+Build a Breeze `ReferenceState` whose surface state and `(θ, qv)` profiles
+come from `sounding`. The sounding's `surface_pressure` anchors the
+hydrostatic integration; θ and qv are passed to Breeze as `z`-callables
+that linearly interpolate the sounding's column.
 
-!!! note
-    Scaffolded for v0.1; the full implementation will delegate to
-    Breeze's existing `ReferenceState` constructor once the per-grid
-    θ/qv profiles are assembled. See
-    [NumericalEarth/Breeze.jl#672](https://github.com/NumericalEarth/Breeze.jl/discussions/672).
+`kwargs` are forwarded to `Breeze.ReferenceState`, so any of its other
+options (`standard_pressure`, `discrete_hydrostatic_balance`,
+`liquid_mass_fraction`, `ice_mass_fraction`, …) can be set here.
+
+# Example
+
+```julia
+using Breeze, LegacyConnectors
+
+grid = RectilinearGrid(CPU(); size = (1, 1, 64),
+                       x = (0, 1), y = (0, 1), z = (0, 16_000),
+                       topology = (Periodic, Periodic, Bounded))
+
+sounding = read_sounding(example_sounding(:weisman_klemp_1982))
+ref      = LegacyConnectors.reference_state(sounding, grid)
+```
 """
-function reference_state end
+function reference_state(sounding::Sounding, grid; kwargs...)
+    z_src = vcat(0.0, sounding.z)
+    θ_src = vcat(sounding.surface_θ,  sounding.θ)
+    q_src = vcat(sounding.surface_qv, sounding.qv)
+
+    θ_of_z(z)  = _linear_interp(z_src, θ_src, z)
+    qv_of_z(z) = _linear_interp(z_src, q_src, z)
+
+    return Breeze.ReferenceState(grid;
+                                 surface_pressure      = sounding.surface_pressure,
+                                 potential_temperature = θ_of_z,
+                                 vapor_mass_fraction   = qv_of_z,
+                                 kwargs...)
+end
