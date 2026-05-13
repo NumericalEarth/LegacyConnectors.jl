@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+title: LegacyConnectors.jl
+message: "If you use LegacyConnectors.jl in academic work, please cite it as below."
+type: software
+authors:
+  - name: "NumericalEarth organization and contributors"
+url: "https://github.com/NumericalEarth/LegacyConnectors.jl"
+repository-code: "https://github.com/NumericalEarth/LegacyConnectors.jl"
+license: Apache-2.0

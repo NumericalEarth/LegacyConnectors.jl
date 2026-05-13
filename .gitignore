@@ -1,0 +1,17 @@
+# Julia
+Manifest.toml
+docs/Manifest.toml
+test/Manifest.toml
+*.cov
+*.jl.cov
+*.jl.mem
+
+# Documenter build output
+docs/build/
+docs/site/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp

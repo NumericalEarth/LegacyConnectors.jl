@@ -1,0 +1,3 @@
+[deps]
+LegacyConnectors = "a57253b0-1ecd-4843-b9c3-e020d5da5ff8"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

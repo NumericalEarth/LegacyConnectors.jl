@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths: &paths
+      - ".github/workflows/CI.yml"
+      - "src/**"
+      - "test/**"
+      - "data/**"
+      - "Project.toml"
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - "1.11"
+          - "1.12"
+          - "nightly"
+        os:
+          - ubuntu-latest
+          - macOS-latest
+        exclude:
+          - version: "nightly"
+            os: macOS-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: julia-actions/setup-julia@4c0cb0fce8556fdb04a90347310e5db8b1f98fb9 # v2.7.0
+        with:
+          version: ${{ matrix.version }}
+      - uses: julia-actions/cache@9a93c5fb3e9c1c20b60fc80a478cae53e38618a4 # v3.0.2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@03114f09f119417c3242a9fb6e0b722676aedf38
+      - uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+        continue-on-error: true
