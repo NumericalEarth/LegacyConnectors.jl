@@ -44,9 +44,13 @@ makedocs(
     modules  = [LegacyConnectors],
     authors  = "NumericalEarth organization and contributors",
     format   = Documenter.HTML(;
-        canonical = "https://numericalearth.github.io/LegacyConnectors.jl",
-        edit_link = "main",
-        assets    = String[],
+        canonical          = "https://numericalearth.github.io/LegacyConnectors.jl",
+        edit_link          = "main",
+        assets             = String[],
+        # Literate'd examples inline figures as base64 PNGs, which can
+        # push individual pages well past Documenter's 200 KiB default.
+        size_threshold      = 600 * 1024,
+        size_threshold_warn = 300 * 1024,
     ),
     pages = [
         "Home"            => "index.md",
