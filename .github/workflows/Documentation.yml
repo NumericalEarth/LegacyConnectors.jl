@@ -10,6 +10,7 @@ on:
       - "docs/**"
       - "src/**"
       - "data/**"
+      - "examples/**"
       - "Project.toml"
   pull_request:
     paths: *paths

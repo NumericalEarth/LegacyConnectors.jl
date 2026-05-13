@@ -23,17 +23,43 @@ Pkg.add(url = "https://github.com/NumericalEarth/LegacyConnectors.jl")
 
 ## Quickstart
 
-```julia
-using LegacyConnectors
+Read a sounding, load it onto a Breeze grid as Oceananigans `Field`s,
+and plot with the Oceananigans Makie extension:
 
-# Load one of the three bundled example soundings…
+```julia
+using LegacyConnectors, Breeze, CairoMakie
+
+# 1. Read one of the three bundled example soundings (or your own file).
 sounding = read_sounding(example_sounding(:weisman_klemp_1982))
 
-# …or your own input_sounding file.
-sounding = read_sounding("/path/to/input_sounding")
+# 2. Build a small column grid and allocate Fields for θ, qv, u, v.
+grid = RectilinearGrid(CPU(); size = (1, 1, 64),
+                       x = (0, 1), y = (0, 1), z = (0, 16_000),
+                       topology = (Periodic, Periodic, Bounded))
+θ, qv, u, v = (CenterField(grid) for _ in 1:4)
 
-@show sounding.surface_pressure  # in Pa
-@show length(sounding)           # number of above-surface levels
+# 3. Linearly interpolate sounding profiles onto each Field.
+for (f, p) in ((θ, :θ), (qv, :qv), (u, :u), (v, :v))
+    LegacyConnectors.set!(f, sounding; profile = p)
+end
+
+# 4. Plot — Oceananigans' Makie ext renders Fields directly.
+fig = Figure(size = (900, 400))
+lines(fig[1, 1], θ;        axis = (; xlabel = "θ (K)",      ylabel = "z (m)"))
+lines(fig[1, 2], qv * 1000; axis = (; xlabel = "qv (g/kg)", ylabel = "z (m)"))
+lines(fig[1, 3], u;        axis = (; xlabel = "u (m/s)",    ylabel = "z (m)"))
+fig
+```
+
+See the rendered version of this in the
+[Sounding → Breeze Field example](https://numericalearth.github.io/LegacyConnectors.jl/dev/literated/breeze_field/).
+
+If you only need the raw profile (no Breeze dep on the rendered side):
+
+```julia
+using LegacyConnectors
+sounding = read_sounding(example_sounding(:weisman_klemp_1982))
+@show sounding.surface_pressure, length(sounding)
 ```
 
 ## Bundled example soundings

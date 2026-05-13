@@ -9,6 +9,7 @@ test/Manifest.toml
 # Documenter build output
 docs/build/
 docs/site/
+docs/src/literated/
 
 # Editor / OS
 .DS_Store

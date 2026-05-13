@@ -9,6 +9,7 @@ on:
       - "src/**"
       - "test/**"
       - "data/**"
+      - "examples/**"
       - "Project.toml"
   pull_request:
     paths: *paths
