@@ -74,15 +74,15 @@ set!(u_a,  (x, y, z) -> u_wk(z))
 
 # ## Build the same Fields by reading the bundled sounding
 
-sounding = read_sounding(example_sounding(:weisman_klemp_1982))
+sounding = Sounding(:weisman_klemp_1982)
 
 θ_s  = CenterField(grid)
 qv_s = CenterField(grid)
 u_s  = CenterField(grid)
 
-set!(θ_s,  sounding; profile = :θ)
-set!(qv_s, sounding; profile = :qv)
-set!(u_s,  sounding; profile = :u)
+set!(θ_s,  sounding.θ)
+set!(qv_s, sounding.qv)
+set!(u_s,  sounding.u)
 
 # ## Plot them on top of each other
 

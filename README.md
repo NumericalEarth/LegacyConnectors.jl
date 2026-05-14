@@ -23,7 +23,7 @@ Pkg.add(url = "https://github.com/NumericalEarth/LegacyConnectors.jl")
 
 ## Quickstart
 
-Read a sounding, load its profiles onto Oceananigans `Field`s on a
+Read a sounding, set its profiles onto Oceananigans `Field`s on a
 Breeze grid, and plot them with the Oceananigans Makie extension:
 
 ![Quickstart: θ, qv, u profiles from the Weisman–Klemp 1982 sounding](docs/src/assets/readme_quickstart.png)
@@ -31,16 +31,16 @@ Breeze grid, and plot them with the Oceananigans Makie extension:
 ```julia
 using LegacyConnectors, Breeze, CairoMakie
 
-sounding = read_sounding(example_sounding(:weisman_klemp_1982))
+sounding = Sounding(:weisman_klemp_1982)   # or Sounding("/path/to/input_sounding")
 
 grid = RectilinearGrid(CPU(); size = (1, 1, 64),
                        x = (0, 1), y = (0, 1), z = (0, 16_000),
                        topology = (Periodic, Periodic, Bounded))
 
 θ, qv, u = (CenterField(grid) for _ in 1:3)
-for (f, p) in ((θ, :θ), (qv, :qv), (u, :u))
-    set!(f, sounding; profile = p)
-end
+set!(θ,  sounding.θ)
+set!(qv, sounding.qv)
+set!(u,  sounding.u)
 
 fig = Figure(size = (900, 400))
 ax_θ  = Axis(fig[1, 1]; xlabel = "θ (K)",     ylabel = "z (m)")
@@ -51,6 +51,12 @@ lines!(ax_qv, qv * 1000)
 lines!(ax_u,  u)
 fig
 ```
+
+`sounding.θ` is a `SoundingProfile <: AbstractVector{Float64}`, so it
+indexes, iterates, and broadcasts like a vector — but it also carries
+its `z` column and `surface_value`, which is what makes
+`set!(field, sounding.θ)` dispatch correctly. Same `set!`, by the way,
+that takes an analytic profile: `set!(field, (x, y, z) -> θ(z))`.
 
 To go further and build the hydrostatic base state Breeze uses for
 its anelastic / compressible split, pass the same sounding to
@@ -73,7 +79,7 @@ If you only need the raw profile (no Breeze dep):
 
 ```julia
 using LegacyConnectors
-sounding = read_sounding(example_sounding(:weisman_klemp_1982))
+sounding = Sounding(:weisman_klemp_1982)
 @show sounding.surface_pressure, length(sounding)
 ```
 

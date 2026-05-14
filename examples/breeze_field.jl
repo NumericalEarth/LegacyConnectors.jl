@@ -25,7 +25,7 @@ using LegacyConnectors
 using Breeze
 using CairoMakie
 
-sounding = read_sounding(example_sounding(:kabq_radiosonde))
+sounding = Sounding(:kabq_radiosonde)
 
 # ## Build the grid
 #
@@ -48,9 +48,10 @@ qv = CenterField(grid)
 u  = CenterField(grid)
 v  = CenterField(grid)
 
-for (f, p) in ((θ, :θ), (qv, :qv), (u, :u), (v, :v))
-    set!(f, sounding; profile = p)
-end
+set!(θ,  sounding.θ)
+set!(qv, sounding.qv)
+set!(u,  sounding.u)
+set!(v,  sounding.v)
 
 # ## Reference state
 #

@@ -9,7 +9,7 @@
 using LegacyConnectors
 using CairoMakie
 
-sounding = read_sounding(example_sounding(:kabq_radiosonde))
+sounding = Sounding(:kabq_radiosonde)
 
 # ## Surface state and the "elevated surface" gotcha
 #

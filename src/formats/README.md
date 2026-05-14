@@ -5,8 +5,9 @@ A new format `:my_format` needs three things:
 1. **A parser** in `src/formats/my_format.jl` that returns a [`Sounding`](../soundings.jl).
    Convert all quantities to SI (Pa, K, kg/kg, m, m/s) at read time so
    downstream code does not need to know which format it came from.
-2. **A dispatch entry** in `read_sounding` (`src/soundings.jl`): add an
-   `elseif format === :my_format` branch and include the new file from
+2. **A dispatch entry** in the `Sounding(::AbstractString; format)`
+   constructor (`src/soundings.jl`): add an `elseif format ===
+   :my_format` branch and `include` the new file from
    `src/LegacyConnectors.jl`.
 3. **Tests** in `test/test_my_format.jl`, ideally driven by a small
    example file bundled in `data/soundings/`.

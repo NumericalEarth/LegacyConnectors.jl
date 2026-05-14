@@ -8,7 +8,7 @@
 using LegacyConnectors
 using CairoMakie
 
-sounding = read_sounding(example_sounding(:abudhabi_gfs))
+sounding = Sounding(:abudhabi_gfs)
 
 # ## `NaN` is a first-class value here
 #

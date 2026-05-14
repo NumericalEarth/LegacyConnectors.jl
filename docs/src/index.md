@@ -22,22 +22,29 @@ Pkg.add(url = "https://github.com/NumericalEarth/LegacyConnectors.jl")
 using LegacyConnectors
 
 # Load one of the three bundled example soundings…
-sounding = read_sounding(example_sounding(:weisman_klemp_1982))
+sounding = Sounding(:weisman_klemp_1982)
 
 # …or your own file.
-sounding = read_sounding("/path/to/input_sounding")
+sounding = Sounding("/path/to/input_sounding")
 ```
 
-A [`Sounding`](@ref) holds the surface state (`surface_pressure`,
-`surface_θ`, `surface_qv` in SI units) and the above-surface profile
-vectors (`z`, `θ`, `qv`, `u`, `v`).
+A [`Sounding`](@ref) holds the surface pressure plus four
+[`SoundingProfile`](@ref)s — `θ`, `qv`, `u`, `v` — each of which
+subtypes `AbstractVector{Float64}` (so it indexes/iterates/broadcasts
+like a normal vector) but also carries its `z` column and surface
+value, which is what makes
+
+```julia
+set!(field, sounding.θ)
+```
+
+dispatch correctly onto Breeze's `set!`.
 
 ## Status
 
-- ✅ `:input_sounding` reader (this is what the discussion asked for).
-- 🚧 Breeze interop helpers (`set!`, `reference_state`): scaffolded for
-  v0.1, real implementation tracked alongside Breeze's `ReferenceState`
-  refactor — see `src/breeze_interop.jl`.
+- ✅ `:input_sounding` reader.
+- ✅ Breeze interop: `set!(::Field, ::SoundingProfile)` and
+  [`LegacyConnectors.reference_state`](@ref) (both real, not scaffold).
 - ⏳ Additional formats (WRF namelists, GFS point profiles in their
   native form, …): scaffolding lives in `src/formats/`; see that
   directory's README to add one.
