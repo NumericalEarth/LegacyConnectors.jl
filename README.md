@@ -6,13 +6,8 @@
 [![codecov](https://codecov.io/gh/NumericalEarth/LegacyConnectors.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/NumericalEarth/LegacyConnectors.jl)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Readers and adapters that let [Breeze.jl](https://github.com/NumericalEarth/Breeze.jl)
-ingest initial conditions from legacy atmospheric modeling formats —
-starting with the CM1/WRF/ERF `input_sounding` text format.
-
-This package exists so Breeze.jl itself can stay focused on its
-dynamical core. See [NumericalEarth/Breeze.jl#672](https://github.com/NumericalEarth/Breeze.jl/discussions/672)
-for the motivating discussion.
+🏛️ Readers and adapters that connect legacy systems like CM1 and WRF to
+NumericalEarth packages, like [Breeze.jl](https://github.com/NumericalEarth/Breeze.jl) .
 
 ## Install
 
