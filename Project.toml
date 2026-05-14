@@ -1,7 +1,7 @@
 name = "LegacyConnectors"
 uuid = "a57253b0-1ecd-4843-b9c3-e020d5da5ff8"
-authors = ["NumericalEarth organization (github.com/NumericalEarth) and lovely contributors"]
 version = "0.1.0"
+authors = ["NumericalEarth organization (github.com/NumericalEarth) and lovely contributors"]
 
 [deps]
 Breeze = "660aa2fb-d4c8-4359-a52c-9c057bc511da"
@@ -10,4 +10,5 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
 Breeze = "0.4"
+DelimitedFiles = "1"
 julia = "1.11"
