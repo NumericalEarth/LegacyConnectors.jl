@@ -1,131 +1,65 @@
 """
-    SoundingProfile <: AbstractVector{Float64}
+    Sounding{F}
 
-A single vertical profile from a sounding — `(z, values)` plus the
-surface value at `z = 0`. Subtypes `AbstractVector{Float64}` over the
-*above-surface* portion, so indexing, iteration, broadcasting, and
-plotting work exactly as they would for a plain `Vector{Float64}`.
-The surface value lives outside the array (access via
-`p.surface_value`) so it isn't accidentally swept into reductions.
+A vertical sounding parsed from a legacy-model file. The four profile
+fields are Oceananigans `Field`s of type `Field{Nothing, Nothing, Center}`
+on a column grid — they index, broadcast, and plot the same way as any
+other Oceananigans field, and they're filled onto a Breeze model grid
+with `Oceananigans.Fields.interpolate!` (the package extends
+`interpolate!` to handle the column-to-3D case).
 
-A `SoundingProfile` also dispatches `set!(::Field, ::SoundingProfile)`
-— that's how you fill a Breeze `Field` from a sounding column.
-
-# Fields
-
-- `z              :: Vector{Float64}`  — above-surface heights (m AGL), sorted ascending
-- `values         :: Vector{Float64}`  — values at those heights (same length as `z`)
-- `surface_value  :: Float64`          — the value at `z = 0`
-- `name           :: Symbol`           — `:θ`, `:qv`, `:u`, or `:v`; used in errors and `show`
-"""
-struct SoundingProfile <: AbstractVector{Float64}
-    z             :: Vector{Float64}
-    values        :: Vector{Float64}
-    surface_value :: Float64
-    name          :: Symbol
-
-    function SoundingProfile(z::Vector{Float64}, values::Vector{Float64},
-                             surface_value::Real, name::Symbol)
-        length(z) == length(values) || throw(ArgumentError(
-            "SoundingProfile: z has length $(length(z)), values has length $(length(values))"))
-        return new(z, values, Float64(surface_value), name)
-    end
-end
-
-Base.size(p::SoundingProfile) = size(p.values)
-Base.@propagate_inbounds Base.getindex(p::SoundingProfile, i::Int) = p.values[i]
-Base.IndexStyle(::Type{SoundingProfile}) = IndexLinear()
-
-function Base.show(io::IO, ::MIME"text/plain", p::SoundingProfile)
-    print(io, "SoundingProfile(:", p.name, ", ", length(p), " levels, ",
-          "surface=", round(p.surface_value; sigdigits = 5), ")")
-end
-
-"""
-    Sounding
-
-A vertical profile of an idealized atmosphere parsed from a legacy-model
-sounding file. All quantities are in SI units after parsing.
+`Sounding` is concretely typed: `F` is the specific column-`Field` type
+produced by the parser, so all four profile fields share a single
+concrete type and the struct can be specialized by Julia at use sites.
 
 # Fields
 
-- `surface_pressure :: Float64` — Pa
-- `θ, qv, u, v` — [`SoundingProfile`](@ref)s in K, kg/kg, m/s, m/s
-- `format :: Symbol` — e.g. `:input_sounding`
-- `source :: String` — original file path, used in error messages
+- `surface_pressure        :: Float64`  — surface pressure (Pa)
+- `potential_temperature   :: F`        — θ (K)
+- `specific_humidity       :: F`        — qᵛ (kg/kg)
+- `x_momentum              :: F`        — u (m/s)
+- `y_momentum              :: F`        — v (m/s)
+- `format                  :: Symbol`   — e.g. `:input_sounding`
+- `source                  :: String`   — original file path
 
-`qv` may contain `NaN` at levels where the source file did not provide
-a moisture value (e.g. mesospheric levels of a GFS point profile).
+Each profile field has `N + 1` z-cells: the first at `z = 0` (the
+surface) and the next `N` at the above-surface levels from the file.
+`specific_humidity` may contain `NaN` at levels where the source did
+not provide moisture.
 
-# Convenience accessors (via `Base.getproperty`)
+# Construction
 
-- `s.surface_θ`, `s.surface_qv` → the surface values of the
-  corresponding `SoundingProfile`s
-- `s.z` → the shared above-surface height vector
-  (`=== s.θ.z === s.qv.z === ...`)
+    Sounding(path::AbstractString; format = :input_sounding)
+    Sounding(name::Symbol)
 
-`length(s)` returns the number of above-surface levels.
-"""
-struct Sounding
-    surface_pressure :: Float64
-    θ  :: SoundingProfile
-    qv :: SoundingProfile
-    u  :: SoundingProfile
-    v  :: SoundingProfile
-    format :: Symbol
-    source :: String
-
-    function Sounding(surface_pressure::Real,
-                      θ::SoundingProfile, qv::SoundingProfile,
-                      u::SoundingProfile, v::SoundingProfile,
-                      format::Symbol, source::AbstractString)
-        # All four profiles must share the same z vector (by value at least).
-        for p in (qv, u, v)
-            p.z == θ.z || throw(ArgumentError(
-                "Sounding: profile :$(p.name) has a different z vector than :θ"))
-        end
-        length(θ) > 0 || throw(ArgumentError("sounding has no above-surface levels"))
-        issorted(θ.z) || throw(ArgumentError(
-            "sounding heights are not monotonically increasing"))
-        return new(Float64(surface_pressure), θ, qv, u, v, format, String(source))
-    end
-end
-
-Base.length(s::Sounding) = length(getfield(s, :θ))
-
-function Base.getproperty(s::Sounding, name::Symbol)
-    name === :surface_θ  && return getfield(s, :θ).surface_value
-    name === :surface_qv && return getfield(s, :qv).surface_value
-    name === :z          && return getfield(s, :θ).z
-    return getfield(s, name)
-end
-
-Base.propertynames(::Sounding) = (:surface_pressure, :surface_θ, :surface_qv,
-                                  :z, :θ, :qv, :u, :v, :format, :source)
-
-function Base.show(io::IO, s::Sounding)
-    print(io, "Sounding(", s.format, ", ", length(s), " levels, ",
-          "p_sfc=", round(s.surface_pressure / 100; digits = 2), " mb, ",
-          "θ_sfc=", round(s.surface_θ; digits = 2), " K, ",
-          "qv_sfc=", round(s.surface_qv * 1000; digits = 2), " g/kg)")
-end
-
-"""
-    Sounding(path::AbstractString; format::Symbol = :input_sounding) -> Sounding
-    Sounding(name::Symbol)                                            -> Sounding
-
-Construct a `Sounding` from a file path, or from the name of one of
-the bundled examples (see [`example_sounding`](@ref) for the list).
-
-`format` selects the on-disk format. Currently supported:
-
-  - `:input_sounding` — the CM1/WRF/ERF text format (default).
+The latter looks the file up via [`example_sounding`](@ref):
 
 ```julia
-s = Sounding("/path/to/input_sounding")     # from disk
-s = Sounding(:weisman_klemp_1982)            # bundled example
+s = Sounding("/path/to/input_sounding")
+s = Sounding(:weisman_klemp_1982)
 ```
 """
+struct Sounding{F}
+    surface_pressure       :: Float64
+    potential_temperature  :: F
+    specific_humidity      :: F
+    x_momentum             :: F
+    y_momentum             :: F
+    format                 :: Symbol
+    source                 :: String
+end
+
+Base.length(s::Sounding) = size(s.potential_temperature, 3)
+
+function Base.show(io::IO, s::Sounding)
+    θ_sfc  = s.potential_temperature[1, 1, 1]
+    qᵛ_sfc = s.specific_humidity[1, 1, 1]
+    print(io, "Sounding(", s.format, ", ", length(s), " z-cells, ",
+          "p_sfc=", round(s.surface_pressure / 100; digits = 2), " mb, ",
+          "θ_sfc=", round(θ_sfc; digits = 2), " K, ",
+          "qᵛ_sfc=", round(qᵛ_sfc * 1000; digits = 2), " g/kg)")
+end
+
 function Sounding(path::AbstractString; format::Symbol = :input_sounding)
     if format === :input_sounding
         return _read_input_sounding(path)
@@ -143,11 +77,12 @@ Sounding(name::Symbol) = Sounding(example_sounding(name))
 Return the absolute path to one of the bundled example soundings:
 
   - `:weisman_klemp_1982` — analytic supercell sounding from
-    Weisman & Klemp (1982); generated by `data/soundings/generate_weisman_klemp_1982.jl`.
+    Weisman & Klemp (1982); generated by
+    `data/soundings/generate_weisman_klemp_1982.jl`.
   - `:kabq_radiosonde`    — observed KABQ (Albuquerque) radiosonde,
-    2025-07-15 00Z; elevated surface, 95 levels.
+    2025-07-15 00Z.
   - `:abudhabi_gfs`       — GFS point forecast at Abu Dhabi,
-    2025-07-15 12Z; 32 levels with `NaN` moisture aloft.
+    2025-07-15 12Z; mesospheric qᵛ levels are `NaN`.
 """
 function example_sounding(name::Symbol)
     file = if name === :weisman_klemp_1982

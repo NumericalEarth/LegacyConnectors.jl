@@ -7,6 +7,7 @@
 # through the parser unchanged.
 
 using LegacyConnectors
+using Breeze
 using CairoMakie
 
 sounding = Sounding(:kabq_radiosonde)
@@ -18,7 +19,7 @@ sounding = Sounding(:kabq_radiosonde)
 # block starts a few hundred metres further up:
 
 (p_sfc_mb = sounding.surface_pressure / 100,
- first_level_z = sounding.z[1])
+ first_level_z_AGL = znodes(sounding.potential_temperature)[2])
 
 # The `z` column in `input_sounding` is **above ground level (AGL)**,
 # not MSL. That convention is what lets one parser handle high-altitude
@@ -26,16 +27,19 @@ sounding = Sounding(:kabq_radiosonde)
 # offset bookkeeping needed.
 
 # ## Plot the profile
+#
+# Each `sounding.<long_name>` is a `Field{Nothing, Nothing, Face}` on a
+# column grid; Oceananigans' Makie ext handles them directly.
 
 fig = Figure(size = (900, 400))
-ax_θ  = Axis(fig[1, 1]; xlabel = "θ (K)",        ylabel = "z (m AGL)",
+ax_θ  = Axis(fig[1, 1]; xlabel = "θ (K)",      ylabel = "z (m AGL)",
              title = "KABQ radiosonde 2025-07-15 00Z")
-ax_qv = Axis(fig[1, 2]; xlabel = "qv (g/kg)",    ylabel = "z (m AGL)")
-ax_w  = Axis(fig[1, 3]; xlabel = "wind (m/s)",   ylabel = "z (m AGL)")
-lines!(ax_θ,  sounding.θ,           sounding.z)
-lines!(ax_qv, sounding.qv .* 1000, sounding.z)
-lines!(ax_w,  sounding.u, sounding.z; label = "u")
-lines!(ax_w,  sounding.v, sounding.z; label = "v")
+ax_qᵛ = Axis(fig[1, 2]; xlabel = "qᵛ (g/kg)",  ylabel = "z (m AGL)")
+ax_w  = Axis(fig[1, 3]; xlabel = "wind (m/s)", ylabel = "z (m AGL)")
+lines!(ax_θ,  sounding.potential_temperature)
+lines!(ax_qᵛ, sounding.specific_humidity * 1000)
+lines!(ax_w,  sounding.x_momentum; label = "u")
+lines!(ax_w,  sounding.y_momentum; label = "v")
 axislegend(ax_w; position = :rb)
 fig
 

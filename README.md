@@ -23,13 +23,14 @@ Pkg.add(url = "https://github.com/NumericalEarth/LegacyConnectors.jl")
 
 ## Quickstart
 
-Read a sounding, set its profiles onto Oceananigans `Field`s on a
-Breeze grid, and plot them with the Oceananigans Makie extension:
+Read a sounding, interpolate its profiles onto Oceananigans `Field`s
+on a Breeze grid, and plot them with the Oceananigans Makie extension:
 
-![Quickstart: θ, qv, u profiles from the Weisman–Klemp 1982 sounding](docs/src/assets/readme_quickstart.png)
+![Quickstart: θ, qᵛ, u profiles from the Weisman–Klemp 1982 sounding](docs/src/assets/readme_quickstart.png)
 
 ```julia
 using LegacyConnectors, Breeze, CairoMakie
+import Breeze.Oceananigans.Fields: interpolate!
 
 sounding = Sounding(:weisman_klemp_1982)   # or Sounding("/path/to/input_sounding")
 
@@ -37,26 +38,28 @@ grid = RectilinearGrid(CPU(); size = (1, 1, 64),
                        x = (0, 1), y = (0, 1), z = (0, 16_000),
                        topology = (Periodic, Periodic, Bounded))
 
-θ, qv, u = (CenterField(grid) for _ in 1:3)
-set!(θ,  sounding.θ)
-set!(qv, sounding.qv)
-set!(u,  sounding.u)
+θ, qᵛ, u = (CenterField(grid) for _ in 1:3)
+interpolate!(θ,  sounding.potential_temperature)
+interpolate!(qᵛ, sounding.specific_humidity)
+interpolate!(u,  sounding.x_momentum)
 
 fig = Figure(size = (900, 400))
 ax_θ  = Axis(fig[1, 1]; xlabel = "θ (K)",     ylabel = "z (m)")
-ax_qv = Axis(fig[1, 2]; xlabel = "qv (g/kg)", ylabel = "z (m)")
+ax_qᵛ = Axis(fig[1, 2]; xlabel = "qᵛ (g/kg)", ylabel = "z (m)")
 ax_u  = Axis(fig[1, 3]; xlabel = "u (m/s)",   ylabel = "z (m)")
 lines!(ax_θ,  θ)
-lines!(ax_qv, qv * 1000)
+lines!(ax_qᵛ, qᵛ * 1000)
 lines!(ax_u,  u)
 fig
 ```
 
-`sounding.θ` is a `SoundingProfile <: AbstractVector{Float64}`, so it
-indexes, iterates, and broadcasts like a vector — but it also carries
-its `z` column and `surface_value`, which is what makes
-`set!(field, sounding.θ)` dispatch correctly. Same `set!`, by the way,
-that takes an analytic profile: `set!(field, (x, y, z) -> θ(z))`.
+`Sounding` is concretely typed: its `potential_temperature`,
+`specific_humidity`, `x_momentum`, and `y_momentum` fields are all
+Oceananigans `Field{Nothing, Nothing, Face}` columns whose face
+positions sit exactly at the file's z-levels (with z = 0 prepended for
+the surface). The package extends `interpolate!` for that column type
+so cross-grid filling does the right thing — linear in z, broadcast in
+x, y.
 
 To go further and build the hydrostatic base state Breeze uses for
 its anelastic / compressible split, pass the same sounding to

@@ -2,20 +2,19 @@
 #
 # This example covers the path you'll usually take when initializing
 # a Breeze simulation from an observed (or model-output) sounding —
-# i.e. one where there is no analytic form to set! against directly.
+# i.e. one where there is no analytic form to `set!` against directly.
 # We use the KABQ radiosonde bundled with the package.
 #
 # Two Breeze objects come out of this:
 #
-#   1. **Prognostic `Field`s** (θ, qv, u, v) on the model grid,
-#      filled by [`LegacyConnectors.set!`](@ref) via linear
-#      interpolation onto the field's z-nodes.
+#   1. **Prognostic `Field`s** (θ, qᵛ, u, v) on the model grid, filled
+#      by `Oceananigans.Fields.interpolate!`, which the package
+#      extends with a column-source method that does broadcast in
+#      `x, y` and linear interpolation in `z`.
 #   2. A **`Breeze.ReferenceState`** — the hydrostatic base state
 #      (pressure, density, temperature) used for the anelastic /
 #      compressible split — built from the same sounding by
-#      [`LegacyConnectors.reference_state`](@ref), which delegates
-#      to `Breeze.ReferenceState(grid; …)` with θ and qv passed in
-#      as `z`-callables that interpolate the sounding's column.
+#      [`LegacyConnectors.reference_state`](@ref).
 #
 # Compare this to the [analytic example](weisman_klemp_supercell.md),
 # which prefers `set!(field, (x, y, z) -> θ(z))` and skips the file
@@ -23,19 +22,12 @@
 
 using LegacyConnectors
 using Breeze
+import Breeze.Oceananigans.Fields: interpolate!
 using CairoMakie
 
 sounding = Sounding(:kabq_radiosonde)
 
-# ## Build the grid
-#
-# A 1×1×Nz column is enough to see the structure. In a real simulation
-# the same calls work on a full 3-D grid: `set!` broadcasts each
-# horizontally-uniform sounding column across (x, y); `ReferenceState`
-# is `(Nothing, Nothing, Center)`-located and so is naturally 1-D in z.
-#
-# KABQ's surface is well above sea level, but the sounding's `z`
-# column is above ground level — so we set the grid to start at 0.
+# ## Build the model grid
 
 grid = RectilinearGrid(CPU(); size = (1, 1, 96),
                        x = (0, 1), y = (0, 1), z = (0, 15_000),
@@ -44,28 +36,22 @@ grid = RectilinearGrid(CPU(); size = (1, 1, 96),
 # ## Prognostic Fields
 
 θ  = CenterField(grid)
-qv = CenterField(grid)
+qᵛ = CenterField(grid)
 u  = CenterField(grid)
 v  = CenterField(grid)
 
-set!(θ,  sounding.θ)
-set!(qv, sounding.qv)
-set!(u,  sounding.u)
-set!(v,  sounding.v)
+interpolate!(θ,  sounding.potential_temperature)
+interpolate!(qᵛ, sounding.specific_humidity)
+interpolate!(u,  sounding.x_momentum)
+interpolate!(v,  sounding.y_momentum)
 
 # ## Reference state
-#
-# A single call gives us a Breeze `ReferenceState` anchored at the
-# sounding's surface pressure, with `θ(z)` and `qv(z)` interpolated
-# from the sounding's column. Breeze takes it from there — hydrostatic
-# integration for `p(z)`, ρ from the ideal gas law, T from the Exner
-# function.
 
 ref = LegacyConnectors.reference_state(sounding, grid)
 
 # `ref.pressure`, `ref.density`, and `ref.temperature` are all
-# Oceananigans `Field`s, so we can `lines!` them just like the
-# prognostic ones.
+# Oceananigans `Field`s, so we `lines!` them just like the prognostic
+# ones.
 
 # ## Plot both layers side by side
 
@@ -73,10 +59,10 @@ fig = Figure(size = (1100, 700))
 
 ax_θ  = Axis(fig[1, 1]; xlabel = "θ (K)",      ylabel = "z (m AGL)",
              title = "Prognostic fields")
-ax_qv = Axis(fig[1, 2]; xlabel = "qv (g/kg)",  ylabel = "z (m AGL)")
+ax_qᵛ = Axis(fig[1, 2]; xlabel = "qᵛ (g/kg)",  ylabel = "z (m AGL)")
 ax_w  = Axis(fig[1, 3]; xlabel = "wind (m/s)", ylabel = "z (m AGL)")
 lines!(ax_θ,  θ)
-lines!(ax_qv, qv * 1000)
+lines!(ax_qᵛ, qᵛ * 1000)
 lines!(ax_w,  u; label = "u")
 lines!(ax_w,  v; label = "v")
 axislegend(ax_w; position = :rb)
@@ -93,5 +79,5 @@ fig
 
 # Top row: prognostic Fields filled from the sounding. Bottom row: the
 # hydrostatic base state Breeze derived from the same surface pressure
-# and θ(z) / qv(z) profiles. These two together are everything Breeze
+# and θ(z) / qᵛ(z) profiles. These two together are everything Breeze
 # needs to start a simulation from this sounding.

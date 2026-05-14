@@ -28,22 +28,25 @@ sounding = Sounding(:weisman_klemp_1982)
 sounding = Sounding("/path/to/input_sounding")
 ```
 
-A [`Sounding`](@ref) holds the surface pressure plus four
-[`SoundingProfile`](@ref)s — `θ`, `qv`, `u`, `v` — each of which
-subtypes `AbstractVector{Float64}` (so it indexes/iterates/broadcasts
-like a normal vector) but also carries its `z` column and surface
-value, which is what makes
+A [`Sounding`](@ref) is concretely typed. Its profile fields —
+`potential_temperature`, `specific_humidity`, `x_momentum`,
+`y_momentum` — are all Oceananigans `Field{Nothing, Nothing, Face}`
+columns whose face positions sit exactly at the file's z-levels (with
+the surface prepended at z = 0). To fill a 3-D Breeze `Field` from one,
+use `Oceananigans.Fields.interpolate!` — the package extends it for
+this column-source case (linear in z, broadcast in x, y):
 
 ```julia
-set!(field, sounding.θ)
-```
+import Breeze.Oceananigans.Fields: interpolate!
 
-dispatch correctly onto Breeze's `set!`.
+θ = CenterField(grid)
+interpolate!(θ, sounding.potential_temperature)
+```
 
 ## Status
 
 - ✅ `:input_sounding` reader.
-- ✅ Breeze interop: `set!(::Field, ::SoundingProfile)` and
+- ✅ Breeze interop: `interpolate!(::Field, ::sounding-column)` and
   [`LegacyConnectors.reference_state`](@ref) (both real, not scaffold).
 - ⏳ Additional formats (WRF namelists, GFS point profiles in their
   native form, …): scaffolding lives in `src/formats/`; see that
