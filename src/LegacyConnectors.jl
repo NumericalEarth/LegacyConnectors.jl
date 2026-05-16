@@ -12,8 +12,7 @@ The public API:
     example name (`Sounding(:weisman_klemp_1982)`).
   - `Oceananigans.Fields.interpolate!(target, sounding.potential_temperature)` —
     the verb for filling a 3-D model `Field` from a column profile.
-    Extended here for the column-source case (broadcast in x, y; linear
-    in z).
+    Handled natively by Oceananigans ≥ 0.107.5.
   - [`reference_state`](@ref): build a `Breeze.ReferenceState` from a
     `Sounding`.
 
