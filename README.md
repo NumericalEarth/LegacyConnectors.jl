@@ -51,9 +51,8 @@ exactly the file's z-levels (with `0.0` prepended for the surface).
 ## Filling a model grid
 
 When you're ready to initialize a Breeze simulation, fill its
-prognostic `Field`s with `Oceananigans.Fields.interpolate!`. The
-package extends `interpolate!` for the column-source case (linear in
-z, broadcast in x, y), so this works across any model grid:
+prognostic `Field`s with `Oceananigans.Fields.interpolate!` — handled
+natively for column-source fields in Oceananigans ≥ 0.107.5:
 
 ```julia
 import Breeze.Oceananigans.Fields: interpolate!

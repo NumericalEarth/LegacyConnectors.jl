@@ -6,7 +6,7 @@ LegacyConnectors = "a57253b0-1ecd-4843-b9c3-e020d5da5ff8"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
 
 [compat]
-Breeze = "0.4"
+Breeze = "0.5"
 CairoMakie = "0.12, 0.13, 0.14, 0.15"
 Documenter = "1"
 Literate = "2"

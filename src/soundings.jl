@@ -32,8 +32,7 @@ The returned `Sounding{F}` is concretely typed: its four profile fields
 a column grid whose z-faces are exactly the file's z-levels (with
 `0.0` prepended for the surface). They index, broadcast, and plot like
 any other Oceananigans field, and they are filled onto a Breeze model
-grid with `Oceananigans.Fields.interpolate!` (extended by this package
-to handle the column-source case).
+grid with `Oceananigans.Fields.interpolate!`.
 
 `specific_humidity` may contain `NaN` at levels where the source did
 not provide moisture (e.g. mesospheric levels of a GFS point profile).
