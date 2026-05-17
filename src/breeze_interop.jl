@@ -10,7 +10,7 @@
 # See Breeze.jl discussion #672 for the motivating proposal.
 
 import Breeze
-using Breeze: znodes
+using Breeze.Oceananigans.Fields: interpolate
 
 """
     LegacyConnectors.reference_state(sounding::Sounding, grid; kwargs...)
@@ -28,26 +28,15 @@ function reference_state(sounding::Sounding, grid; kwargs...)
     θ_field  = sounding.potential_temperature
     qᵛ_field = sounding.specific_humidity
 
-    z_src = collect(znodes(θ_field))
-    θ_src = [θ_field[1, 1, k]  for k in 1:size(θ_field, 3)]
-    q_src = [qᵛ_field[1, 1, k] for k in 1:size(qᵛ_field, 3)]
-
-    θ_of_z(z)  = _linear_interp(z_src, θ_src, z)
-    qᵛ_of_z(z) = _linear_interp(z_src, q_src, z)
+    # Breeze.ReferenceState wants z-callables for the θ and qᵛ profiles
+    # (its Field-input docstring overstates what's implemented). Wrap
+    # the sounding fields via Oceananigans' per-point interpolate.
+    θ_of_z(z)  = interpolate((nothing, nothing, z), θ_field)
+    qᵛ_of_z(z) = interpolate((nothing, nothing, z), qᵛ_field)
 
     return Breeze.ReferenceState(grid;
                                  surface_pressure      = sounding.surface_pressure,
                                  potential_temperature = θ_of_z,
                                  vapor_mass_fraction   = qᵛ_of_z,
                                  kwargs...)
-end
-
-function _linear_interp(xs::AbstractVector, ys::AbstractVector, x::Real)
-    x ≤ xs[1]   && return ys[1]
-    x ≥ xs[end] && return ys[end]
-    i = searchsortedfirst(xs, x)
-    x0, x1 = xs[i - 1], xs[i]
-    y0, y1 = ys[i - 1], ys[i]
-    t = (x - x0) / (x1 - x0)
-    return (1 - t) * y0 + t * y1
 end
