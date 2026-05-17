@@ -22,22 +22,32 @@ Pkg.add(url = "https://github.com/NumericalEarth/LegacyConnectors.jl")
 using LegacyConnectors
 
 # Load one of the three bundled example soundings…
-sounding = read_sounding(example_sounding(:weisman_klemp_1982))
+sounding = Sounding(:weisman_klemp_1982)
 
 # …or your own file.
-sounding = read_sounding("/path/to/input_sounding")
+sounding = Sounding("/path/to/input_sounding")
 ```
 
-A [`Sounding`](@ref) holds the surface state (`surface_pressure`,
-`surface_θ`, `surface_qv` in SI units) and the above-surface profile
-vectors (`z`, `θ`, `qv`, `u`, `v`).
+A [`Sounding`](@ref) is concretely typed. Its profile fields —
+`potential_temperature`, `specific_humidity`, `x_momentum`,
+`y_momentum` — are all Oceananigans `Field{Nothing, Nothing, Face}`
+columns whose face positions sit exactly at the file's z-levels (with
+the surface prepended at z = 0). To fill a 3-D Breeze `Field` from one,
+use `Oceananigans.Fields.interpolate!` — handled natively for
+column-source fields in Oceananigans ≥ 0.107.5:
+
+```julia
+import Breeze.Oceananigans.Fields: interpolate!
+
+θ = CenterField(grid)
+interpolate!(θ, sounding.potential_temperature)
+```
 
 ## Status
 
-- ✅ `:input_sounding` reader (this is what the discussion asked for).
-- 🚧 Breeze interop helpers (`set!`, `reference_state`): scaffolded for
-  v0.1, real implementation tracked alongside Breeze's `ReferenceState`
-  refactor — see `src/breeze_interop.jl`.
+- ✅ `:input_sounding` reader.
+- ✅ Breeze interop: `interpolate!(::Field, ::sounding-column)` and
+  [`LegacyConnectors.reference_state`](@ref) (both real, not scaffold).
 - ⏳ Additional formats (WRF namelists, GFS point profiles in their
   native form, …): scaffolding lives in `src/formats/`; see that
   directory's README to add one.

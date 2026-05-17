@@ -1,64 +1,52 @@
-"""
-    Sounding
-
-A vertical profile of an idealized atmosphere parsed from a legacy-model
-sounding file. All quantities are in SI units after parsing:
-
-  - `surface_pressure :: Float64` — Pa
-  - `surface_θ        :: Float64` — K (potential temperature)
-  - `surface_qv       :: Float64` — kg/kg (water vapor mixing ratio)
-  - `z, θ, qv, u, v`  :: `Vector{Float64}` — height (m AGL), θ (K),
-    qv (kg/kg), u (m/s), v (m/s); levels above the surface, sorted by
-    ascending `z`.
-  - `format :: Symbol` — e.g. `:input_sounding`.
-  - `source :: String` — original file path, used in error messages.
-
-`qv` may contain `NaN` at levels where the source file did not provide
-a moisture value (e.g. mesospheric levels of a GFS point profile).
-"""
-struct Sounding
-    surface_pressure :: Float64
-    surface_θ        :: Float64
-    surface_qv       :: Float64
-    z  :: Vector{Float64}
-    θ  :: Vector{Float64}
-    qv :: Vector{Float64}
-    u  :: Vector{Float64}
-    v  :: Vector{Float64}
-    format :: Symbol
-    source :: String
-
-    function Sounding(p_sfc, θ_sfc, qv_sfc, z, θ, qv, u, v, format, source)
-        n = length(z)
-        length(θ)  == n || throw(ArgumentError("θ has length $(length(θ)) but expected $n"))
-        length(qv) == n || throw(ArgumentError("qv has length $(length(qv)) but expected $n"))
-        length(u)  == n || throw(ArgumentError("u has length $(length(u)) but expected $n"))
-        length(v)  == n || throw(ArgumentError("v has length $(length(v)) but expected $n"))
-        n > 0 || throw(ArgumentError("sounding has no above-surface levels"))
-        issorted(z) || throw(ArgumentError("sounding heights are not monotonically increasing"))
-        return new(p_sfc, θ_sfc, qv_sfc, z, θ, qv, u, v, format, source)
-    end
+struct Sounding{F}
+    surface_pressure       :: Float64
+    potential_temperature  :: F
+    specific_humidity      :: F
+    x_momentum             :: F
+    y_momentum             :: F
+    format                 :: Symbol
+    source                 :: String
 end
 
-Base.length(s::Sounding) = length(s.z)
+Base.length(s::Sounding) = size(s.potential_temperature, 3)
 
 function Base.show(io::IO, s::Sounding)
-    print(io, "Sounding(", s.format, ", ", length(s), " levels, ",
-          "p_sfc=", round(s.surface_pressure / 100; digits=2), " mb, ",
-          "θ_sfc=", round(s.surface_θ; digits=2), " K, ",
-          "qv_sfc=", round(s.surface_qv * 1000; digits=2), " g/kg)")
+    θ_sfc  = s.potential_temperature[1, 1, 1]
+    qᵛ_sfc = s.specific_humidity[1, 1, 1]
+    print(io, "Sounding(", s.format, ", ", length(s), " z-cells, ",
+          "p_sfc=", round(s.surface_pressure / 100; digits = 2), " mb, ",
+          "θ_sfc=", round(θ_sfc; digits = 2), " K, ",
+          "qᵛ_sfc=", round(qᵛ_sfc * 1000; digits = 2), " g/kg)")
 end
 
 """
-    read_sounding(path; format=:input_sounding) -> Sounding
+    Sounding(path::AbstractString; format::Symbol = :input_sounding) -> Sounding
+    Sounding(name::Symbol)                                            -> Sounding
 
-Read a sounding file. Currently supported `format`s:
+Construct a vertical sounding from a file path, or from the name of one
+of the bundled examples (see [`example_sounding`](@ref) for the list).
+
+The returned `Sounding{F}` is concretely typed: its four profile fields
+— `potential_temperature`, `specific_humidity`, `x_momentum`,
+`y_momentum` — are all Oceananigans `Field{Nothing, Nothing, Face}`s on
+a column grid whose z-faces are exactly the file's z-levels (with
+`0.0` prepended for the surface). They index, broadcast, and plot like
+any other Oceananigans field, and they are filled onto a Breeze model
+grid with `Oceananigans.Fields.interpolate!`.
+
+`specific_humidity` may contain `NaN` at levels where the source did
+not provide moisture (e.g. mesospheric levels of a GFS point profile).
+
+`format` selects the on-disk format. Currently supported:
 
   - `:input_sounding` — the CM1/WRF/ERF text format (default).
 
-Unknown formats raise an `ArgumentError` listing the supported set.
+```julia
+s = Sounding("/path/to/input_sounding")
+s = Sounding(:weisman_klemp_1982)
+```
 """
-function read_sounding(path::AbstractString; format::Symbol=:input_sounding)
+function Sounding(path::AbstractString; format::Symbol = :input_sounding)
     if format === :input_sounding
         return _read_input_sounding(path)
     else
@@ -67,29 +55,65 @@ function read_sounding(path::AbstractString; format::Symbol=:input_sounding)
     end
 end
 
+Sounding(name::Symbol) = Sounding(example_sounding(name))
+
 """
     example_sounding(name::Symbol) -> String
 
-Return the absolute path to one of the bundled example soundings:
+Return the absolute path to a bundled example sounding. Dispatches on
+`Val(name)`, so adding a new bundled example is a one-line method
+definition:
+
+```julia
+LegacyConnectors.example_sounding(::Val{:my_new_one}) =
+    joinpath(pkgdir(LegacyConnectors), "data", "soundings", "my_new_one.txt")
+```
+
+Built-in names:
 
   - `:weisman_klemp_1982` — analytic supercell sounding from
-    Weisman & Klemp (1982); generated by `data/soundings/generate_weisman_klemp_1982.jl`.
+    Weisman & Klemp (1982); generated by
+    `data/soundings/generate_weisman_klemp_1982.jl`.
   - `:kabq_radiosonde`    — observed KABQ (Albuquerque) radiosonde,
-    2025-07-15 00Z; elevated surface, 95 levels.
+    2025-07-15 00Z.
   - `:abudhabi_gfs`       — GFS point forecast at Abu Dhabi,
-    2025-07-15 12Z; 32 levels with `NaN` moisture aloft.
+    2025-07-15 12Z; mesospheric qᵛ levels are `NaN`.
 """
-function example_sounding(name::Symbol)
-    file = if name === :weisman_klemp_1982
-        "weisman_klemp_1982.txt"
-    elseif name === :kabq_radiosonde
-        "input_sounding_kabq_radiosonde_2025-07-15_00z.txt"
-    elseif name === :abudhabi_gfs
-        "input_sounding_abudhabi_gfs_2025-07-15_12z.txt"
-    else
-        throw(ArgumentError(
-            "Unknown example sounding $(repr(name)). Available: " *
-            ":weisman_klemp_1982, :kabq_radiosonde, :abudhabi_gfs."))
+example_sounding(name::Symbol) = example_sounding(Val(name))
+
+example_sounding(::Val{:weisman_klemp_1982}) =
+    _bundled_sounding_path("weisman_klemp_1982.txt")
+
+example_sounding(::Val{:kabq_radiosonde}) =
+    _bundled_sounding_path("input_sounding_kabq_radiosonde_2025-07-15_00z.txt")
+
+example_sounding(::Val{:abudhabi_gfs}) =
+    _bundled_sounding_path("input_sounding_abudhabi_gfs_2025-07-15_12z.txt")
+
+# Fallback for symbols nobody has registered. Introspects which
+# `Val{:thing}` specializations of `example_sounding` exist so the
+# error message stays in sync with whatever's been defined.
+function example_sounding(::Val{name}) where {name}
+    available = sort(_registered_example_sounding_names())
+    throw(ArgumentError(
+        "Unknown example sounding $(repr(name)). Available: " *
+        join(repr.(available), ", ") * "."))
+end
+
+_bundled_sounding_path(file) =
+    joinpath(pkgdir(LegacyConnectors), "data", "soundings", file)
+
+function _registered_example_sounding_names()
+    names = Symbol[]
+    for m in methods(example_sounding)
+        sig = m.sig
+        sig isa DataType || continue
+        params = sig.parameters
+        length(params) == 2 || continue
+        T = params[2]
+        T isa DataType && T <: Val || continue
+        tp = T.parameters
+        length(tp) == 1 && tp[1] isa Symbol && push!(names, tp[1])
     end
-    return joinpath(pkgdir(LegacyConnectors), "data", "soundings", file)
+    return names
 end
