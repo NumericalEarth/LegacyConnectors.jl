@@ -33,8 +33,8 @@ A [`Sounding`](@ref) is concretely typed. Its profile fields —
 `y_momentum` — are all Oceananigans `Field{Nothing, Nothing, Face}`
 columns whose face positions sit exactly at the file's z-levels (with
 the surface prepended at z = 0). To fill a 3-D Breeze `Field` from one,
-use `Oceananigans.Fields.interpolate!` — the package extends it for
-this column-source case (linear in z, broadcast in x, y):
+use `Oceananigans.Fields.interpolate!` — handled natively for
+column-source fields in Oceananigans ≥ 0.107.5:
 
 ```julia
 import Breeze.Oceananigans.Fields: interpolate!
